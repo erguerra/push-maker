@@ -1,6 +1,6 @@
 # Push Maker
 
-> A “vibe coding” side tool I built for my own manual testing workflow. Feel free to fork/tinker, but it ships as-is with zero guarantees.
+> A “vibe coding” side tool I built for my own manual testing workflow. Feel free to fork/tinker under the MIT License, but it ships as-is with zero guarantees.
 
 Push Maker is a Compose Multiplatform desktop tool (macOS/Windows/Linux) that lets you craft push notification payloads and broadcast them to Android emulators or devices through ADB. It is designed to speed up manual regression testing by giving you a friendly GUI for payload editing, re-sending, and persistence across launches.
 
