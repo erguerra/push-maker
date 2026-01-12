@@ -1,0 +1,14 @@
+--app-image
+"/Users/erguerra/push-maker/composeApp/build/compose/binaries/main-release/app"
+--resource-dir
+"/Users/erguerra/push-maker/composeApp/build/compose/tmp/resources"
+--type
+"dmg"
+--dest
+"/Users/erguerra/push-maker/composeApp/build/compose/binaries/main-release/dmg"
+--name
+"PushMaker"
+--app-version
+"1.0.0"
+--mac-entitlements
+"/Users/erguerra/push-maker/composeApp/build/compose/default-resources/1.6.10/default-entitlements.plist"
