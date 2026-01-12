@@ -65,3 +65,12 @@ The Gradle build already declares native distributions (DMG/MSI/DEB). Run the pa
 - **Linux** – `./gradlew :composeApp:packageReleaseDeb`
 
 Each command bundles the JVM runtime and produces an installer you can share. For a portable archive (no installer) you can run `./gradlew :composeApp:createDistributable`, which places an app folder/zip under `composeApp/build/compose/binaries`. If you just need a runnable jar for any OS, use `./gradlew :composeApp:packageReleaseUberJarForCurrentOS`.
+
+## Install via Homebrew (macOS)
+
+```
+brew tap erguerra/push-maker
+brew install push-maker
+```
+
+The tap downloads the Push Maker DMG from the corresponding GitHub release. Linux packages (DEB/RPM) will land once native builds are available; until then, Linux and Windows users should grab installers directly from the [releases page](https://github.com/erguerra/push-maker/releases).
