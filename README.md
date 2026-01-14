@@ -10,7 +10,7 @@ Push Maker is a Compose Multiplatform desktop tool (macOS/Windows/Linux) that le
 - **Push builder** – compose notification metadata (title, body, channel, collapse key, priority, icon) plus arbitrary custom key/value fields without leaving the keyboard.
 - **Send, save, repeat** – sending does not clear the form so you can replay the same payload; you can also save pushes for later and re-open them in a single click.
 - **Persistent storage** – saved pushes are stored as JSON under the standard OS config directory (`~/Library/Application Support/PushMaker`, `%APPDATA%\PushMaker`, or `$XDG_CONFIG_HOME/PushMaker`).
-- **ADB integration** – the app wraps `adb shell am broadcast` and sends the payload JSON via the `payload` extra using the `com.pushmaker.DEBUG_PUSH` action, so you can hook your receiver in the test app.
+- **ADB integration** – by default every form field is emitted as its own `--es` extra (e.g. `title`, `body`, `metadata.foo`). Flip to Raw JSON mode to send a hand-crafted JSON blob under the `payload` extra if your receiver expects that.
 - **ADB aware** – it tries common SDK locations, lets you set the exact executable via the in-app settings dialog, and links you to the official Platform Tools download if nothing is detected.
 
 ## Requirements
@@ -32,6 +32,7 @@ The first launch will create a storage file for saved pushes and try to detect d
 - Provide **at least one** of Title or Body in the form. All other fields (channel, collapse key, icon, metadata, custom data) are optional and only enrich the payload.
 - The **Broadcast action** field determines which Android receivers will get the intent (defaults to `com.pushmaker.DEBUG_PUSH`). Change it if your target app listens on a custom action.
 - Optionally set **Target component** to force delivery to a specific receiver (format `package/.Receiver`).
+- Structured mode emits one `--es` per field/metadata/custom data entry. Raw JSON mode lets you type/import arbitrary JSON that is sent as the `payload` extra.
 - If ADB is not detected automatically, click the gear icon in the toolbar to point the app at your `adb` binary or open the Platform Tools download page.
 - A friendly Name is only needed if you plan to save the push for reuse.
 

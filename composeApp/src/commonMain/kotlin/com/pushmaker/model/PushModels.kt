@@ -8,6 +8,9 @@ import kotlin.random.Random
 enum class PushPriority { NORMAL, HIGH }
 
 @Serializable
+enum class PayloadMode { STRUCTURED, RAW_JSON }
+
+@Serializable
 data class KeyValueField(
     val id: String = randomId(),
     val key: String = "",
@@ -28,6 +31,8 @@ data class PushPayload(
     val icon: String = "",
     val metadata: List<KeyValueField> = emptyList(),
     val dataFields: List<KeyValueField> = emptyList(),
+    val payloadMode: PayloadMode = PayloadMode.STRUCTURED,
+    val rawJsonPayload: String = "",
     val createdAt: Long = nowMillis(),
     val updatedAt: Long = nowMillis()
 )

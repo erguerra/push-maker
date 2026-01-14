@@ -1,13 +1,9 @@
 package com.pushmaker.adb
 
+import com.pushmaker.model.PayloadMode
 import com.pushmaker.model.PushPayload
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
 import java.io.BufferedReader
 import java.util.concurrent.TimeUnit
 
@@ -27,8 +23,7 @@ sealed interface AdbCommandResult {
 }
 
 class AdbService(
-    initialExecutable: String? = System.getenv("ADB"),
-    private val json: Json = Json { encodeDefaults = false }
+    initialExecutable: String? = System.getenv("ADB")
 ) {
     @Volatile
     private var customExecutable: String? = initialExecutable?.takeIf { it.isNotBlank() }
@@ -53,8 +48,6 @@ class AdbService(
 
     suspend fun sendPush(deviceId: String, payload: PushPayload): AdbCommandResult =
         withContext(Dispatchers.IO) {
-            val jsonPayload = encodePayload(payload)
-            val escapedPayload = quoteForShell(jsonPayload)
             val executable = resolveExecutable()
             val args = buildList {
                 addAll(listOf(executable, "-s", deviceId, "shell", "am", "broadcast"))
@@ -62,7 +55,16 @@ class AdbService(
                 if (payload.targetComponent.isNotBlank()) {
                     addAll(listOf("-n", payload.targetComponent))
                 }
-                addAll(listOf("--es", "payload", escapedPayload))
+                when (payload.payloadMode) {
+                    PayloadMode.STRUCTURED -> {
+                        structuredExtras(payload).forEach { (key, value) ->
+                            addAll(listOf("--es", key, quoteForShell(value)))
+                        }
+                    }
+                    PayloadMode.RAW_JSON -> {
+                        addAll(listOf("--es", "payload", quoteForShell(payload.rawJsonPayload)))
+                    }
+                }
             }
             val result = runCommand(args)
             if (result.exitCode == 0) {
@@ -76,28 +78,6 @@ class AdbService(
                 AdbCommandResult.Failure(message.ifBlank { "ADB command failed" })
             }
         }
-
-    private fun encodePayload(payload: PushPayload): String = json.encodeToString(
-        buildJsonObject {
-            put("name", payload.name)
-            put("title", payload.title)
-            put("body", payload.body)
-            put("channelId", payload.channelId)
-            put("collapseKey", payload.collapseKey)
-            put("priority", payload.priority.name.lowercase())
-            put("icon", payload.icon)
-            putJsonObject("metadata") {
-                payload.metadata.forEach { field ->
-                    if (field.key.isNotBlank()) put(field.key, field.value)
-                }
-            }
-            putJsonObject("data") {
-                payload.dataFields.forEach { field ->
-                    if (field.key.isNotBlank()) put(field.key, field.value)
-                }
-            }
-        }
-    )
 
     private fun parseDeviceLine(line: String): AdbDevice? {
         val trimmed = line.trim()
@@ -135,4 +115,28 @@ private fun quoteForShell(value: String): String {
     if (value.isEmpty()) return "''"
     val escaped = value.replace("'", "'\\''")
     return "'$escaped'"
+}
+
+private fun structuredExtras(payload: PushPayload): Map<String, String> {
+    val map = linkedMapOf<String, String>()
+    fun putIfNotBlank(key: String, value: String) {
+        if (value.isNotBlank()) map[key] = value
+    }
+    putIfNotBlank("title", payload.title)
+    putIfNotBlank("body", payload.body)
+    putIfNotBlank("channelId", payload.channelId)
+    putIfNotBlank("collapseKey", payload.collapseKey)
+    putIfNotBlank("priority", payload.priority.name.lowercase())
+    putIfNotBlank("icon", payload.icon)
+    payload.metadata.forEach { field ->
+        if (field.key.isNotBlank()) {
+            map["metadata.${field.key}"] = field.value
+        }
+    }
+    payload.dataFields.forEach { field ->
+        if (field.key.isNotBlank()) {
+            map["data.${field.key}"] = field.value
+        }
+    }
+    return map
 }

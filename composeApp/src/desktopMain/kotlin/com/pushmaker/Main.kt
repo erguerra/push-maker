@@ -60,6 +60,7 @@ import com.pushmaker.adb.AdbService
 import com.pushmaker.data.AppSettingsRepository
 import com.pushmaker.data.PushRepository
 import com.pushmaker.model.KeyValueField
+import com.pushmaker.model.PayloadMode
 import com.pushmaker.model.PushPayload
 import com.pushmaker.model.PushPriority
 import kotlinx.coroutines.launch
@@ -138,6 +139,9 @@ fun PushMakerDesktopApp(controller: PushMakerController) {
                     push = uiState.currentPush,
                     onChange = controller::updateCurrentPush,
                     onPriorityChange = controller::updatePriority,
+                    onModeChange = controller::updatePayloadMode,
+                    onRawJsonChange = controller::updateRawJsonPayload,
+                    onImportRawJson = controller::importRawJsonFromFile,
                     onSend = controller::sendCurrentPush,
                     onSave = controller::saveCurrentPush,
                     onClear = controller::clearCurrentPush,
@@ -264,6 +268,9 @@ private fun PushForm(
     push: PushPayload,
     onChange: ((PushPayload) -> PushPayload) -> Unit,
     onPriorityChange: (PushPriority) -> Unit,
+    onModeChange: (PayloadMode) -> Unit,
+    onRawJsonChange: (String) -> Unit,
+    onImportRawJson: () -> Unit,
     onSend: () -> Unit,
     onSave: () -> Unit,
     onClear: () -> Unit,
@@ -307,6 +314,31 @@ private fun PushForm(
             color = MaterialTheme.colorScheme.outline
         )
         Spacer(Modifier.height(12.dp))
+        PayloadModeSelector(current = push.payloadMode, onModeChange = onModeChange)
+        Spacer(Modifier.height(12.dp))
+        if (push.payloadMode == PayloadMode.STRUCTURED) {
+            StructuredPayloadEditor(push, onChange, onPriorityChange)
+        } else {
+            RawJsonEditor(push.rawJsonPayload, onRawJsonChange, onImportRawJson)
+        }
+        Spacer(Modifier.height(20.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = onSend, enabled = !isSending) {
+                Text(if (isSending) "Sending..." else "Send push")
+            }
+            OutlinedButton(onClick = onSave) { Text("Save this push") }
+            OutlinedButton(onClick = onClear) { Text("Clear fields") }
+        }
+    }
+}
+
+@Composable
+private fun StructuredPayloadEditor(
+    push: PushPayload,
+    onChange: ((PushPayload) -> PushPayload) -> Unit,
+    onPriorityChange: (PushPriority) -> Unit
+) {
+    Column {
         OutlinedTextField(
             value = push.title,
             onValueChange = { value -> onChange { it.copy(title = value) } },
@@ -358,12 +390,49 @@ private fun PushForm(
             onFieldsChange = { list -> onChange { it.copy(dataFields = list) } }
         )
         Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+private fun RawJsonEditor(
+    json: String,
+    onChange: (String) -> Unit,
+    onImport: () -> Unit
+) {
+    Column {
+        OutlinedTextField(
+            value = json,
+            onValueChange = onChange,
+            label = { Text("JSON payload (sent as --es payload)") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 8
+        )
+        Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onSend, enabled = !isSending) {
-                Text(if (isSending) "Sending..." else "Send push")
+            TextButton(onClick = onImport) { Text("Import JSON file") }
+            TextButton(onClick = { onChange("") }) { Text("Clear JSON") }
+        }
+    }
+}
+
+@Composable
+private fun PayloadModeSelector(current: PayloadMode, onModeChange: (PayloadMode) -> Unit) {
+    Column {
+        Text("Payload mode", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            PayloadMode.values().forEach { mode ->
+                val selected = mode == current
+                val label = when (mode) {
+                    PayloadMode.STRUCTURED -> "Structured (multiple extras)"
+                    PayloadMode.RAW_JSON -> "Raw JSON"
+                }
+                if (selected) {
+                    Button(onClick = { onModeChange(mode) }) { Text(label) }
+                } else {
+                    OutlinedButton(onClick = { onModeChange(mode) }) { Text(label) }
+                }
             }
-            OutlinedButton(onClick = onSave) { Text("Save this push") }
-            OutlinedButton(onClick = onClear) { Text("Clear fields") }
         }
     }
 }

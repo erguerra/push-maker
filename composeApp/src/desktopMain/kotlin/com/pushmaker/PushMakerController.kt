@@ -9,6 +9,7 @@ import com.pushmaker.data.AppSettingsRepository
 import com.pushmaker.data.PushRepository
 import com.pushmaker.model.DEFAULT_PUSH_ACTION
 import com.pushmaker.model.KeyValueField
+import com.pushmaker.model.PayloadMode
 import com.pushmaker.model.PushPayload
 import com.pushmaker.model.PushPriority
 import com.pushmaker.model.touch
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.awt.Desktop
+import java.io.File
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JFileChooser
@@ -134,11 +136,15 @@ class PushMakerController(
             _uiState.value = state.copy(message = "Select a device before sending")
             return
         }
-        if (state.currentPush.title.isBlank() && state.currentPush.body.isBlank()) {
+        val payload = sanitize(state.currentPush)
+        if (payload.payloadMode == PayloadMode.STRUCTURED && payload.title.isBlank() && payload.body.isBlank()) {
             _uiState.value = state.copy(message = "Add at least a title or body")
             return
         }
-        val payload = sanitize(state.currentPush)
+        if (payload.payloadMode == PayloadMode.RAW_JSON && payload.rawJsonPayload.isBlank()) {
+            _uiState.value = state.copy(message = "Provide JSON payload content")
+            return
+        }
         scope.launch {
             _uiState.value = _uiState.value.copy(isSending = true)
             when (val result = adbService.sendPush(targetDevice, payload)) {
@@ -167,6 +173,23 @@ class PushMakerController(
 
     fun updatePriority(priority: PushPriority) {
         updateCurrentPush { it.copy(priority = priority) }
+    }
+
+    fun updatePayloadMode(mode: PayloadMode) {
+        updateCurrentPush { it.copy(payloadMode = mode) }
+    }
+
+    fun updateRawJsonPayload(value: String) {
+        updateCurrentPush { it.copy(rawJsonPayload = value) }
+    }
+
+    fun importRawJsonFromFile() {
+        scope.launch {
+            val file = chooseFileForRawJson() ?: return@launch
+            runCatching { file.readText() }
+                .onSuccess { updateRawJsonPayload(it) }
+                .onFailure { err -> _uiState.update { state -> state.copy(message = "Failed to read file: ${err.message}") } }
+        }
     }
 
     fun consumeMessage() {
@@ -278,6 +301,26 @@ class PushMakerController(
         }
     }
 
+    private fun chooseFileForRawJson(): File? {
+        val reference = AtomicReference<File?>()
+        return try {
+            SwingUtilities.invokeAndWait {
+                val chooser = JFileChooser().apply {
+                    fileSelectionMode = JFileChooser.FILES_ONLY
+                    dialogTitle = "Select JSON payload"
+                }
+                val result = chooser.showOpenDialog(null)
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    reference.set(chooser.selectedFile)
+                }
+            }
+            reference.get()
+        } catch (error: Exception) {
+            _uiState.update { it.copy(message = "File picker error: ${error.message}") }
+            null
+        }
+    }
+
     private fun chooseAdbExecutableUsingDialog(): String? {
         val resultRef = AtomicReference<String?>()
         return try {
@@ -303,12 +346,15 @@ private fun ensureEditable(payload: PushPayload): PushPayload = payload.copy(
     action = payload.action.ifBlank { DEFAULT_PUSH_ACTION },
     targetComponent = payload.targetComponent.trim(),
     metadata = payload.metadata.takeUnless { it.isEmpty() } ?: listOf(KeyValueField()),
-    dataFields = payload.dataFields.takeUnless { it.isEmpty() } ?: listOf(KeyValueField())
+    dataFields = payload.dataFields.takeUnless { it.isEmpty() } ?: listOf(KeyValueField()),
+    payloadMode = payload.payloadMode,
+    rawJsonPayload = payload.rawJsonPayload
 )
 
 private fun sanitize(payload: PushPayload): PushPayload = payload.copy(
     action = payload.action.ifBlank { DEFAULT_PUSH_ACTION },
     targetComponent = payload.targetComponent.trim(),
     metadata = payload.metadata.filter { it.key.isNotBlank() || it.value.isNotBlank() },
-    dataFields = payload.dataFields.filter { it.key.isNotBlank() || it.value.isNotBlank() }
+    dataFields = payload.dataFields.filter { it.key.isNotBlank() || it.value.isNotBlank() },
+    rawJsonPayload = payload.rawJsonPayload.trim()
 )
